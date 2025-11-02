@@ -53,11 +53,3 @@ It contributes directly to the university’s FY25 Climate Action Plan, focusing
 ## Skills Demonstrated
 R Programming · R Markdown · Data Cleaning · Statistical Estimation · ggplot2 · Environmental Analytics · Sustainability Reporting · Collaboration · Data Visualization  
 
----
-
-## Repository Structure
-
-├── data/ # Input survey and ZIP datasets
-├── scripts/ # Analysis and visualization scripts
-├── results/ # HTML report and figures
-└── README.md # Project overview
