@@ -1,0 +1,1614 @@
+---
+title: MU Annual Commuting Mileage Estimation - Description and Preliminary Analysis
+output: 
+  html_document:
+    theme: journal       
+    toc: true           
+    toc_float: true     
+    toc_depth: 3       
+    number_sections: true
+---
+
+**Author**: Charntel Kazingizi , Richel Attafuah
+
+**Date**: 2025-10-11
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(ggplot2)
+
+```
+
+
+# Executive Summary
+
+Post-stratified estimates from the FY25 commuting survey show that Miami University commuters collectively traveled about **13.8 million miles** during the academic year.  
+Of this total, **employees accounted for roughly 10.4 million miles (≈75%)**, while **students contributed about 3.4 million miles (≈25%)**.
+
+Total annual **gasoline consumption** is estimated at **approximately 539,000 gallons ± 15,160**, resulting in **total CO₂ emissions of about 4,794 metric tons ± 135**.  
+This translates to an average emission factor of **8.9 kilograms of CO₂ per gallon of gasoline**, which aligns closely with the U.S. EPA benchmark for gasoline combustion.
+
+These results demonstrate that **employee commuting dominates total emissions**, primarily due to longer travel distances and higher commuting frequency.  
+Student commuting, though less in magnitude, remains an important contributor that can be addressed through expanded transit, biking, and walking programs.
+
+Sampling uncertainty is moderate around 10–12 percent of each total indicating that the survey provides a **statistically reliable baseline** for university-wide commuting activity.  
+These findings now serve as the official **FY25 baseline** for tracking progress toward the university’s Climate Action Plan targets on transportation-related greenhouse gas reductions.
+
+
+
+# Introduction
+This project focuses on estimating the environmental impact of commuting at Miami University for fiscal year 2025 (FY25). Specifically, the goal is to calculate total annual commuting miles, gasoline consumption, and greenhouse gas emissions for two groups: faculty/staff employees and commuter students. These estimates will also be combined to give an overall picture of university commuting patterns.  
+
+This work supports the Climate Action Plan and a directive from President Crawford to better understand and reduce Scope 3 emissions related to daily travel. Since commuting is one of the largest indirect sources of greenhouse gas emissions for the university, obtaining accurate and transparent estimates is an important first step toward planning meaningful sustainability initiatives.  
+
+The available data come from the optional online parking permit survey, which provides self-reported commute frequency and addresses for distance calculations. While this data source does not capture every commuter, it offers a practical foundation for analysis. Using reported commute days, miles to campus, and standard assumptions about fuel efficiency and carbon emissions, this analysis will generate descriptive totals for miles traveled, gallons of gasoline consumed, and metric tons of CO₂ released.  
+
+
+## Research Questions
+
+This study is designed to address the following questions for fiscal year 2025 (FY25):
+
+1. For all commuting Miami University employees (faculty and staff):
+- What is the estimated total annual commuting distance (in miles)?
+- How much gasoline is consumed annually (in gallons)?
+- What are the resulting greenhouse gas emissions (in metric tons of CO₂ equivalent)?
+
+2. For all commuting Miami University students:
+- What is the estimated total annual commuting distance (in miles)?
+- How much gasoline is consumed annually (in gallons)?
+- What are the resulting greenhouse gas emissions (in metric tons of CO₂ equivalent)?
+
+3. For all commuters combined (employees + students):
+- What is the overall total annual commuting distance, gasoline consumption, and greenhouse gas emissions?
+
+In addition, the preliminary analysis will provide:
+
+- Descriptive summaries of commuting distances and frequencies for both groups.
+- Visual comparisons between employee and student commuting patterns.
+- A foundation for identifying sources of uncertainty and planning how to assign margins of error in the final analysis.
+
+
+
+### Data
+
+## Data Dictionary
+
+To simplify analysis, survey question text was shortened into variable names.  
+The table below shows the shortened name used in this report alongside the full survey wording.
+
+## Student Commuters
+
+| Short Name        | Original Survey Question                                                                 |
+|-------------------|-------------------------------------------------------------------------------------------|
+| Live_on_campus    | Will you live on campus during the 2024–2025 academic year?                               |
+| Days_FallSpring   | On average, how many days a week do/will you come to campus in Fall/Spring semester?      |
+| Days_JTerm        | On average, how many days a week do/will you come to campus in J-Term?                    |
+| Days_Summer       | On average, how many days a week do/will you come to campus in Summer?                    |
+| Mode_Walk         | Walk (percentage of commute trips by walking)                                             |
+| Mode_GasCar       | Drive (gas, hybrid electric, or diesel-powered car/truck)                                 |
+| Mode_ElectricCar  | Drive (plug-in electric vehicle)                                                          |
+| Mode_Bike         | Bicycle or use other non-motorized means                                                  |
+| Mode_Bus          | BCRTA bus                                                                                 |
+| Mode_Carpool      | Vanpool or carpool as a passenger                                                          |
+| Mode_Motorcycle   | Use a motorcycle, scooter, or moped                                                       |
+| Mode_Other        | Other                                                                                     |
+| Miles_to_campus   | GIS-calculated road miles from respondent’s home to campus                                |
+
+## Employee Commuters
+
+| Short Name        | Original Survey Question                                                                 |
+|-------------------|-------------------------------------------------------------------------------------------|
+| Days_FallSpring   | How many days in a week during the regular Fall/Spring semesters do you commute to campus?|
+| Remote_FallSpring | How many days in a week during the regular Fall/Spring semesters do you work remote?      |
+| Days_SummerJTerm  | How many days in a week during Summer and Winter/J-Term do you commute to/from campus?    |
+| Remote_SummerJTerm| How many days in a week during Summer and Winter/J-Term do you work remote?               |
+| GasVehicle_100    | When you commute to campus, do you commute using a gas-powered vehicle 100% of the time?  |
+| Mode_GasCar       | Driving (gas, hybrid electric, or diesel-powered car/truck)                               |
+| Mode_ElectricCar  | Driving (plug-in electric vehicle)                                                        |
+| Mode_Walk         | Walk                                                                                      |
+| Mode_Bike         | Bicycle or use other non-motorized means                                                  |
+| Mode_Bus          | BCRTA bus                                                                                 |
+| Mode_Carpool      | Vanpool or carpool as a passenger                                                          |
+| Mode_Motorcycle   | Use a motorcycle, scooter or moped                                                        |
+| Mode_Other        | Other                                                                                     |
+| Miles_to_campus   | GIS-calculated road miles from respondent’s home to campus                                |
+
+## Response Variable
+
+In this study, the primary **response (dependent) variable** is defined as the total commuting impact of Miami University students and employees. This response is measured in three related forms:
+
+- **Annual Commuting Miles Driven**  
+  The total miles traveled between home and campus over the course of FY25, accounting for round trips and reported commuting frequency.
+
+- **Annual Gasoline Consumption (gallons)**  
+  The estimated fuel use, derived from annual miles driven and an assumed average vehicle fuel efficiency (e.g., 25 miles per gallon).
+
+- **Annual Greenhouse Gas Emissions (metric tons CO₂e)**  
+  The estimated emissions produced from gasoline consumption, calculated using the EPA factor of 8.89 kg CO₂ per gallon of gasoline.
+
+These three outcomes represent different perspectives on the same underlying response: the environmental impact of commuter travel.
+
+
+
+## Exploratory Data Analysis (EDA)
+
+Before estimating annual commuting impacts, it is important to first explore the survey data to understand its structure and key patterns. Exploratory Data Analysis provides a descriptive overview of the data, highlighting distributions, central tendencies, and potential outliers. This step ensures that the assumptions made in later calculations are grounded in the observed data.  
+
+In this section, summary statistics and visualizations are presented for the main explanatory variables, such as distance to campus, commuting frequency, and commuting mode. These descriptive findings will provide context for the response variables of interest (annual miles, fuel use, and CO₂ emissions) and serve as a baseline for the final analysis.
+
+
+
+```{r load-data, include=FALSE, warning=FALSE, message = FALSE}
+# read students data 
+
+# path to your file
+excel_path <- "Miami_Commuter_Analysis_FY25.xlsx"
+
+# read: students only
+students_raw <- read_excel(excel_path, sheet = "Student Calculations")
+
+# Trim whitespace from column names to avoid trailing spaces
+names(students_raw) <- trimws(names(students_raw))
+
+# rename to short, analysis-friendly names 
+# Build a named vector mapping: new_name = old_name
+rename_map_students <- c(
+  live_on_campus   = "USER_Will_you_live_on_campus_during_the_2024_2025_academic_year_",
+  days_fallspring  = "On average, how many days a week do/will you come to campus in Fall/Spring semester?",
+  days_jterm       = "On average, how many days a week do/will you come to campus in JTerm?",
+  days_summer      = "On average, how many days a week do/will you come to campus in Summer?",
+  mode_walk        = "Walk",
+  mode_gascar      = "Drive (gas, hybrid electric, or diesel-powered car/truck)",
+  mode_electriccar = "Drive (plug-in electric vehicle)",
+  mode_bike        = "Bicycle or use other non-motorized means",
+  mode_bus         = "BCRTA bus",
+  mode_carpool     = "Vanpool or carpool as a passenger",
+  mode_motorcycle  = "Use a motorcycle, scooter or moped",
+  mode_other       = "Other",
+  miles_to_campus  = "Miles_to_campus"
+)
+
+# Perform the rename safely (keep any extra cols if present)
+students <- students_raw %>%
+  rename(any_of(rename_map_students))
+
+head(students)
+glimpse(students)
+```
+
+
+```{r understanding the data,include=FALSE, warning=FALSE, message=FALSE}
+# Quick glance at classes
+sapply(students, class)
+
+# Nice compact structure view
+str(students)
+
+# Count missing values per column
+na_count <- colSums(is.na(students))
+na_pct   <- round(100 * colMeans(is.na(students)), 2)
+
+data.frame(column = names(students), na_count, na_pct)
+```
+
+
+```{r modes,include=FALSE, warning=FALSE, message=FALSE}
+# calculate row-wise sum of all mode percentages
+mode_cols <- c("mode_walk","mode_gascar","mode_electriccar",
+               "mode_bike","mode_bus","mode_carpool",
+               "mode_motorcycle","mode_other")
+
+students$mode_total <- rowSums(students[, mode_cols], na.rm = TRUE)
+
+# flag totals
+students$mode_flag <- case_when(
+  is.na(students$mode_total)        ~ "missing",
+  students$mode_total < 90          ~ "< 90%",
+  students$mode_total > 110         ~ "> 110%",
+  TRUE                              ~ "ok"
+)
+
+# Quick summary: how many rows in each category
+table(students$mode_flag)
+
+# Summary stats for mode totals
+summary(students$mode_total)
+
+# Peek at first 10 rows to see the pattern
+# Just show mode_total and flag for all students
+students %>%
+  select(mode_total, mode_flag) 
+
+```
+
+
+### Considering Students Data
+#### Mode Totals and Quality Check for the Student Data
+
+Students were asked to assign commuting modes in percentages, which should ideally sum to 100%. To assess this, a variable (mode_total) was created to sum across all mode responses, and a flag (mode_flag) was added to classify each row as:
+
+- **ok**: total between 90% and 110%
+- **< 90%**: undters,  
+- 58 (95%) were flagged as **ok**,  
+- 1 (2%) was flagged as **< 90%** (lowest total = 30%),  
+- 2 (3%) were flagged as **> 110%** (highest total = 120%).  
+
+- The distribution of totals was very consistent:  
+- Minimum = 30%  
+- Median = 100%  
+- Mean = 99.3%  
+- Maximum = 120%
+
+
+```{r mode_plot,warning=FALSE, message=FALSE, echo=FALSE}
+flag_df <- students %>%
+  count(mode_flag) %>%
+  mutate(pct = 100 * n / sum(n),
+         label = paste0(n, " (", sprintf("%.1f", pct), "%)"))
+
+ggplot(flag_df, aes(x = mode_flag, y = n)) +
+  geom_col() +
+  geom_text(aes(label = label), vjust = -0.25) +
+  labs(
+    title = "Data Quality Flags for Mode Totals",
+    x = "Flag",
+    y = "Count"
+  ) +
+  theme_minimal(base_size = 12) +
+  ylim(0, max(flag_df$n) * 1.15)
+
+```
+
+**Interpretation:**  
+The majority of students reported commuting modes that summed cleanly to 100%. Only three cases were substantially off, likely due to incomplete or imprecise survey responses. For this preliminary analysis, mode percentages are retained as reported, with flagged rows noted but not excluded.
+
+
+```{r data_cleaning,warning=FALSE, message=FALSE, include =FALSE }
+
+# if a student didn’t allocate %, it’s reasonable to assume they didn’t use that mode.
+mode_cols <- c("mode_walk","mode_gascar","mode_electriccar","mode_bike",
+               "mode_bus","mode_carpool","mode_motorcycle","mode_other")
+students[mode_cols] <- lapply(students[mode_cols], function(x) ifelse(is.na(x), 0, x))
+
+students$days_jterm[is.na(students$days_jterm)] <- 0
+students$days_summer[is.na(students$days_summer)] <- 0
+
+sum(is.na(students))
+
+colSums(is.na(students)) #there are no missing values now 
+
+```
+
+```{r eda1,warning=FALSE, message=FALSE, echo=FALSE}
+boxplot(students[, c("days_fallspring", "days_jterm", "days_summer")],
+        main = "Days on Campus (by Semester)",
+        ylab = "Days per Week",
+        col = c("skyblue", "lightgreen", "lightcoral"), # custom colors
+        names = c("Fall/Spring", "J-Term", "Summer"))  # nice axis labels
+
+```
+
+**Interpretation:**  
+- During the Fall/Spring semesters, students typically commute 4–5 days per week, with the distribution tightly centered around the standard academic schedule. This suggests a consistent commuting pattern across most students.  
+- For the J-Term, commuting days are substantially lower, with most students commuting 0–2 days per week. A few students reported higher values, but the overall pattern reflects the shorter and more intensive nature of J-Term courses.  
+- The Summer semester shows very minimal commuting, with the majority of students reporting 0 days on campus. A handful of outliers exist where students reported regular commuting, likely tied to specific summer coursework, research, or employment.  
+
+
+
+```{r eda2,warning=FALSE, message=FALSE, echo=FALSE}
+library(ggplot2)
+mode_means <- colMeans(students[, c("mode_walk", "mode_gascar", "mode_electriccar",
+                                    "mode_bike", "mode_bus", "mode_carpool",
+                                    "mode_motorcycle", "mode_other")], na.rm=TRUE)
+
+
+# Reshape into data frame
+mode_df <- data.frame(
+  Mode = names(mode_means),
+  Mean = as.numeric(mode_means)
+)
+
+ggplot(mode_df, aes(x = reorder(Mode, -Mean), y = Mean, fill = Mode)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = round(Mean, 1)), vjust = -0.5, size = 3.5) +
+  scale_fill_manual(values = c("skyblue", "gray40", "limegreen", "orange", 
+                               "purple", "gold", "brown", "pink")) +
+  labs(title = "Average Commuting Mode Share (%)",
+       x = "Mode of Transportation",
+       y = "Mean Percentage") +
+  # Extend y-axis a bit for labels
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+
+```
+
+The chart shows that gas-powered cars account for the vast majority of commuting, making up 84.2 percent of the average mode share. Walking is the next most common option at 9.8 percent, while carpooling, buses, biking, electric cars, motorcycles, and other alternatives each contribute very small shares, all together under 6 percent. This pattern highlights a strong reliance on personal vehicles.
+
+
+
+```{r eda3,warning=FALSE, message=FALSE, echo=FALSE}
+hist(students$miles_to_campus, breaks = 15,
+     main = "Distribution of Miles to Campus",
+     xlab = "Miles",
+     col = "skyblue",        # fill color
+     border = "white")       # clean white borders
+
+```
+
+The distribution of miles to campus shows that most students live within a short distance, with the highest frequency clustered at fewer than 10 miles. A smaller group of students commute between 15 and 30 miles, and only a few travel longer distances of 40 miles or more. This indicates that the majority of commuting is local, but there are still some students with significant travel distances.
+
+
+```{r eda4,warning=FALSE, message=FALSE, echo=FALSE}
+
+# Scatterplot
+ggplot(students, aes(x = miles_to_campus, y = mode_gascar)) +
+  geom_point(color = "darkred", alpha = 0.7, size = 2) +
+  #geom_smooth(method = "lm", se = FALSE, color = "blue", linetype = "dashed") +
+  labs(title = "Distance vs Gas Car Use", x = "Miles to Campus", y = "% Trips by Gas Car") +
+  theme_minimal(base_size = 13)
+```
+
+
+The scatterplot of distance versus gas car use shows that reliance on gas cars is consistently high across all commuting distances. Even at short distances, many students report high percentages of gas car use, and this dependence remains strong as distance increases. The pattern demonstrates that distance to campus has little effect on reducing gas car reliance, suggesting that alternatives such as walking or biking are not widely adopted even for shorter commutes.
+
+
+
+### Considering Employees Data
+#### Mode Totals and Quality Check for the Employees Data
+
+For each employee, the sum of the mode shares should be close to 100. To make this easier to track, 
+a flag was created to categorize responses into three groups: less than 90, greater than 110, and ok if they fall in range. 
+This helps highlight responses where reported percentages may not sum correctly or where unusual values were entered.
+
+
+```{r load-employee-data, include=FALSE, warning=FALSE, message=FALSE}
+# read employees data 
+
+# path to your file
+excel_path <- "Miami_Commuter_Analysis_FY25.xlsx"
+
+# read: employees only
+employees_raw <- read_excel(excel_path, sheet = "Employee Calculations")
+
+# Trim whitespace from column names to avoid trailing spaces
+names(employees_raw) <- trimws(names(employees_raw))
+
+# rename to short, analysis-friendly names 
+# Build a named vector mapping: new_name = old_name
+rename_map_employees <- c(
+  days_fallspring   = "How many days in a week during the regular Fall/Spring semesters do you commute to campus? (Please see the definition of commuting above)",
+  remote_fallspring = "How many days in a week during the regular Fall/Spring semesters do you work remote or from your residence?",
+  days_summerjterm  = "How many days in a week during Summer and Winter/JTerm when the campus is open do you commute to/from campus? (Please see the definition of commuting above)",
+  remote_summerjterm= "How many days in a week during Summer and Winter/JTerm when the campus is open do you work remote or from your residence?",
+  gasvehicle_100    = "When you commute to campus, do you commute using a gas powered vehicle 100% of the time?",
+  mode_gascar       = "Driving (gas, hybrid electric, or diesel-powered car/truck)",
+  mode_electriccar  = "Driving (plug-in electric vehicle)",
+  mode_walk         = "Walk",
+  mode_bike         = "Bicycle or use other non-motorized means",
+  mode_bus          = "BCRTA bus",
+  mode_carpool      = "Vanpool or carpool as a passenger",
+  mode_motorcycle   = "Use a motorcycle, scooter or moped",
+  mode_other        = "Other",
+  miles_to_campus   = "Miles_to_campus"
+)
+
+# Perform the rename safely (keep any extra cols if present)
+employees <- employees_raw %>%
+  rename(any_of(rename_map_employees))
+
+head(employees)
+glimpse(employees)
+
+```
+
+
+
+```{r employees-cleaning, include=FALSE, warning=FALSE, message=FALSE}
+library(readxl)
+library(dplyr)
+library(tidyr)
+
+# Prepare mode columns ----------
+mode_cols <- c("mode_gascar","mode_electriccar","mode_walk","mode_bike",
+               "mode_bus","mode_carpool","mode_motorcycle","mode_other")
+
+# Coerce modes to numeric and replace only mode NAs with 0 (no changes to non-mode fields)
+employees <- employees %>%
+  mutate(across(all_of(mode_cols), ~ suppressWarnings(as.numeric(.)))) %>%
+  mutate(across(all_of(mode_cols), ~ replace_na(., 0)))
+
+# Enforce survey rule: if gasvehicle_100 == "Yes" → 100% gas, others 0
+employees <- employees %>%
+  mutate(
+    mode_gascar      = ifelse(gasvehicle_100 == "Yes", 100, mode_gascar),
+    mode_electriccar = ifelse(gasvehicle_100 == "Yes",   0, mode_electriccar),
+    mode_walk        = ifelse(gasvehicle_100 == "Yes",   0, mode_walk),
+    mode_bike        = ifelse(gasvehicle_100 == "Yes",   0, mode_bike),
+    mode_bus         = ifelse(gasvehicle_100 == "Yes",   0, mode_bus),
+    mode_carpool     = ifelse(gasvehicle_100 == "Yes",   0, mode_carpool),
+    mode_motorcycle  = ifelse(gasvehicle_100 == "Yes",   0, mode_motorcycle),
+    mode_other       = ifelse(gasvehicle_100 == "Yes",   0, mode_other)
+  )
+
+# Compute totals and quality flags 
+employees <- employees %>%
+  rowwise() %>%
+  mutate(mode_total = sum(c_across(all_of(mode_cols)))) %>%
+  ungroup() %>%
+  mutate(
+    flag = case_when(
+      mode_total < 90  ~ "< 90%",
+      mode_total > 110 ~ "> 110%",
+      TRUE             ~ "ok"
+    )
+  )
+
+#  QA summaries you can cite in the report 
+# NA counts in mode columns (should be all zeros)
+qa_mode_na <- employees %>%
+  summarise(across(all_of(mode_cols), ~ sum(is.na(.))))
+
+# Drop rows where gasvehicle_100 == "No" and all modes = 0
+employees <- employees %>%
+  filter(!(gasvehicle_100 == "No" & mode_total == 0))
+
+# Flag distribution
+qa_flag_counts <- employees %>% count(flag)
+
+# Problem rows (kept for transparency; no rescaling)
+qa_problem_rows <- employees %>%
+  filter(flag != "ok") %>%
+  select(gasvehicle_100, all_of(mode_cols), mode_total, flag)
+
+employees <- employees %>%
+  filter(!(if_all(all_of(mode_cols), is.na)))
+
+# Print QA tables to the document
+qa_mode_na
+qa_flag_counts
+qa_problem_rows
+
+
+```
+
+
+```{r eda_employee2,echo=FALSE, warning=FALSE, message=FALSE }
+ggplot(qa_flag_counts, aes(x = flag, y = n, fill = flag)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = paste0(n, " (", round(n / sum(n) * 100, 1), "%)")),
+            vjust = -0.5, size = 5, fontface = "bold") +
+  labs(
+    title = "Data Quality Flags for Mode Totals",
+    x = "Flag",
+    y = "Count"
+  ) +
+  expand_limits(y = max(qa_flag_counts$n) * 1.1) +  # adds headroom above bars
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+
+
+```
+The results show that the vast majority of employee responses fell within the acceptable range, 
+with only a very small number flagged as either over-reporting mode percentages. 
+This confirms that data quality is generally strong, and the flagged cases can be kept for transparency 
+without rescaling since our goal here is exploration.
+
+
+```{r graph1,echo=FALSE, warning=FALSE, message=FALSE }
+library(ggplot2)
+library(dplyr)
+
+# Histograms of commuting days
+ggplot(employees, aes(x = days_fallspring)) +
+  geom_histogram(binwidth = 1, fill = "#2E86AB", color = "white") +
+  labs(title = "Distribution of Commuting Days (Fall/Spring)",
+       x = "Days per Week", y = "Number of Employees") +
+  theme_minimal(base_size = 14)
+
+
+```
+This plot shows the distribution of commuting days per week for employees during the Fall and Spring semesters. The majority of employees commute to campus five days a week, reflecting a traditional full-time on-campus work schedule. A smaller but noticeable group commutes three or four days, which may suggest partial remote work or flexible schedules. Very few employees report commuting one or two days, and only a handful do not commute at all during these semesters. Overall, the data highlights that most employees maintain a consistent, daily commuting pattern, while a minority adopt hybrid or reduced commuting arrangements.
+
+
+```{r graph2,echo=FALSE, warning=FALSE, message=FALSE }
+
+ggplot(employees, aes(x = days_summerjterm)) +
+  geom_histogram(binwidth = 1, fill = "#56B4E9", color = "white") +
+  labs(title = "Distribution of Commuting Days (Summer and Winter/J-Term)",
+       x = "Days per Week", y = "Number of Employees") +
+  theme_minimal(base_size = 14)
+
+
+```
+This plot displays the distribution of commuting days during the summer and winter terms (J-Term). The data shows two clear patterns. A significant number of employees report not commuting at all, reflecting either remote work or seasonal breaks. At the same time, the largest group commutes five days per week, similar to patterns observed in the fall and spring semesters. In between, smaller groups of employees report two to four commuting days per week. This mix highlights the variability in work arrangements during these shorter terms, with a balance between non-commuting employees and those maintaining a regular on-campus presence.
+
+
+```{r graph3,echo=FALSE, warning=FALSE, message=FALSE}
+mode_means <- employees %>%
+  select(starts_with("mode_"), -mode_total) %>%
+  summarise(across(everything(), mean))
+
+mode_means_long <- mode_means %>%
+  tidyr::pivot_longer(cols = everything(), names_to = "mode", values_to = "mean_share")
+
+ggplot(mode_means_long, aes(x = reorder(mode, mean_share), y = mean_share, fill = mode)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Average Commuting Mode Shared Among Employees",
+      y = "Mean Percentage", x = "Mode") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+```
+
+This chart shows the average commuting mode shares among employees. The results are clear that gas-powered vehicles dominate commuting behavior, accounting for nearly the entire share. All other modes, such as biking, electric vehicles, walking, carpooling, and buses, represent only a very small fraction of overall commuting patterns. This emphasizes a strong reliance on traditional gas cars as the primary mode of transportation, with only minimal diversification into alternative or more sustainable commuting methods.
+
+
+```{r graph4,echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(employees, aes(x = miles_to_campus)) +
+  geom_histogram(binwidth = 2, fill = "#009E73", color = "white") +
+  labs(title = "Distribution of Distance to Campus",
+       x = "Miles to Campus", y = "Number of Employees") +
+  theme_minimal(base_size = 14)
+```
+This chart shows the distribution of employee commuting distances to campus. The majority of employees live within a short distance, with a sharp peak under 5 miles. Beyond this, the distribution spreads out gradually, with fewer employees commuting from longer distances. A small number of employees report commutes exceeding 40 miles, with a few extreme outliers traveling more than 100 miles. Overall, the pattern suggests that most commuting is local, though there is still meaningful variation that includes both moderate and long-distance travel.
+
+```{r graph5,echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(employees, aes(x = miles_to_campus, y = mode_gascar)) +
+  geom_point(alpha = 0.4, color = "#D55E00") +
+  #geom_smooth(method = "loess", se = FALSE, color = "black") +
+  labs(title = "Gas Vehicle Share vs. Distance to Campus",
+       x = "Miles to Campus", y = "Gas Car Share (%)") +
+  theme_minimal(base_size = 14)
+
+```
+This plot shows the relationship between distance to campus and the share of commuting by gas-powered cars. The overwhelming majority of employees report a 100 percent reliance on gas cars regardless of how far they live from campus. A small number of employees indicate mixed commuting patterns, with gas car shares below 100 percent, but these are scattered and relatively rare. The overall trend highlights that gas vehicles are the dominant commuting mode across all distances, reinforcing their central role in employee travel behavior.
+
+
+# Methodology
+
+## Overview
+We estimate annual commuting miles, fuel consumption, and greenhouse gas emissions for Miami University commuters in FY25. Results are produced separately for students and employees and then combined. The workflow works at the respondent level first, then aligns results to the full population with post-stratification. Uncertainty is quantified with a stratified bootstrap.
+
+## Data sources and unit of analysis
+The main source is the parking permit survey, which includes mode shares, days on campus, and GIS miles to campus. The unit of analysis is the individual survey respondent. We later scale respondent-level results to the full population using official counts.
+
+## Cleaning and validation
+Cleaning ensures inputs are usable and internally consistent.
+
+1. One record per respondent. Duplicates are removed.
+2. Variables are coerced to the right types. Mode shares are clamped to 0–100. Where totals fall between 90 and 110, shares are re-scaled to sum to 100. Rows below 90 or above 110 are retained and flagged for transparency.
+3. Distance validation sets negative values to missing and flags implausibly large values for review.
+4. Students who live on campus have commuting distance and days set to zero for outcome calculations. They remain in descriptive tables with a clear flag.
+5. For employees, remote days are used only to ensure that the days used in calculations represent on-campus commuting, not total work days.
+6. Missingness is tracked. Where imputations are applied, records are flagged so that sensitivity checks can be run.
+
+## Term structure and annualization
+Commute frequency varies by term. To convert to annual commuting days, each term’s days per week is multiplied by the number of active weeks in that term, then summed across terms. Let \(D_{\text{FallSpring}}, D_{\text{JTerm}}, D_{\text{Summer}}\) be self-reported commuting days per week and \(W_{\cdot}\) be official week counts:
+
+\[
+\text{AnnualDays}_i
+= D_{\text{FallSpring},i} \times W_{\text{FallSpring}}
++ D_{\text{JTerm},i} \times W_{\text{JTerm}}
++ D_{\text{Summer},i} \times W_{\text{Summer}}.
+\]
+
+Daily round-trip miles are \(2 \times \text{MilesToCampus}\). Annual miles are:
+
+\[
+\text{Miles}_i = 2 \times \text{MilesToCampus}_i \times \text{AnnualDays}_i.
+\]
+
+## Mode treatment
+Survey responses include mode shares that typically sum to 100 percent. For rows within the 90–110 band, shares are re-scaled to 100 for internal consistency. Rows outside this band remain flagged and are kept for transparency. Walking and biking contribute miles but zero fuel and zero emissions. Bus treatment depends on the available factor type. Carpool miles and fuel are allocated per rider using an assumed or reported carpool size.
+
+## Fuel use and MPG
+Fuel use is derived from annual miles and vehicle efficiency:
+
+\[
+\text{Gallons}_i = \frac{\text{Miles}_i}{\text{MPG}_i}.
+\]
+
+When respondent-specific MPG is missing, MPG is imputed from available vehicle information. If no details are available, a study default is applied and flagged. For carpooling, each rider is assigned an equal share of gallons. Electric vehicles are excluded from gasoline totals. Motorcycles follow the same structure as gas cars with their own MPG.
+
+## Emission factors
+Gasoline emissions use the EPA factor of 8.887 kg CO₂ per gallon, expressed as 0.008887 metric tons CO₂ per gallon:
+
+\[
+\text{MTCO2e}_i = \text{Gallons}_i \times 0.008887.
+\]
+
+Bus emissions are estimated using either a per passenger-mile factor or a local factor if provided. Where factor uncertainty is material, we report a range in sensitivity analysis.
+
+## Post-stratification
+Survey respondents are weighted to represent the full student and employee populations. Post-strata are defined using available frame variables that align with official counts, for example student level, residency, distance band, and parking permit status. For each stratum \(h\) with population size \(N_h\) and sample mean \(\bar{y}_h\) of an outcome \(y\) (miles, gallons, or MTCO₂e), the post-stratified total is:
+
+\[
+\hat{T}_y = \sum_h N_h \bar{y}_h.
+\]
+
+Per-capita estimates use \(\hat{\bar{y}} = \frac{1}{N} \sum_h N_h \bar{y}_h\) with \(N = \sum_h N_h\).
+
+## Uncertainty and standard errors
+Uncertainty is quantified with a stratified bootstrap. Within each stratum, respondents are resampled with replacement, the full pipeline is recomputed, and the total is recorded. The standard error is the standard deviation of bootstrap totals. Confidence intervals use percentile or normal approximations. Sparse or empty strata are collapsed prior to resampling.
+
+## Sensitivity analysis
+We test the robustness of results by varying key assumptions:
+- Term week counts \(W_{\cdot}\) within plausible bounds.
+- MPG imputation by ±15 percent or by alternative vehicle classes.
+- Carpool size defaults, for example 2 versus 3 riders.
+- Bus factor choices when local data are not available.
+
+
+
+
+```{r parameters, include=FALSE, warning=FALSE, message=FALSE}
+# ---- analysis parameters ----
+WEEKS_FALLSPRING <- 30      # total Fall/Spring teaching weeks (adjust to MU official)
+WEEKS_JTERM      <- 3
+WEEKS_SUMMER     <- 12
+
+MPG_GAS           <- 25     # average miles per gallon
+CARPOOL_OCCUPANCY <- 2.0
+EF_CO2_KG_PER_GAL <- 8.887  # kg CO2 per gallon
+KG_PER_METRIC_TON <- 1000
+EF_GAS_MTCO2      <- EF_CO2_KG_PER_GAL / KG_PER_METRIC_TON  # 0.008887
+
+# population sizes for post-stratification
+N_students  <- 943
+N_employees <- 2802
+
+# ---- helper functions ----
+co0        <- function(x) replace(x, is.na(x), 0)
+bound01    <- function(x) pmax(0, pmin(1, x))
+bound0100  <- function(x) pmax(0, pmin(100, x))
+yn_to_bool <- function(x) {
+  v <- tolower(trimws(as.character(x)))
+  ifelse(v %in% c("yes","y","true","1"), TRUE,
+         ifelse(v %in% c("no","n","false","0"), FALSE, NA))
+}
+cap_days <- function(x) pmax(0, pmin(7, as.numeric(x)))
+```
+
+
+## Student Commuting Results: FY25 Sample Summary
+
+
+```{r studentsumary,include=FALSE, warning=FALSE, message=FALSE}
+# ============================
+# Part A — Students (uses global parameters)
+# ============================
+
+## Compute annual commuting days and miles ----
+students <- students %>%
+  mutate(
+    annual_days = (cap_days(days_fallspring) * WEEKS_FALLSPRING) +
+                  (cap_days(days_jterm)      * WEEKS_JTERM) +
+                  (cap_days(days_summer)     * WEEKS_SUMMER),
+    roundtrip_miles_day = 2 * as.numeric(miles_to_campus),
+    annual_miles_total  = roundtrip_miles_day * annual_days
+  )
+
+## Allocate miles by mode (percent → miles) ----
+mode_cols <- c("mode_gascar","mode_electriccar","mode_carpool","mode_motorcycle",
+               "mode_bus","mode_walk","mode_bike","mode_other")
+
+for (m in mode_cols) {
+  students[[paste0("miles_", m)]] <- students$annual_miles_total * (bound0100(students[[m]]) / 100)
+}
+
+## Estimate gallons of fuel used (person-level) ----
+# Gas + motorcycle consume fuel; carpool gallons are divided by occupancy.
+students <- students %>%
+  mutate(
+    mpg = dplyr::if_else(
+      (co0(mode_gascar) + co0(mode_motorcycle) + co0(mode_carpool)) > 0,
+      MPG_GAS, NA_real_
+    ),
+    gallons_gascar      = co0(miles_mode_gascar)     / mpg,
+    gallons_motorcycle  = co0(miles_mode_motorcycle) / mpg,
+    gallons_carpool_raw = co0(miles_mode_carpool)    / mpg,
+    gallons_carpool     = gallons_carpool_raw / CARPOOL_OCCUPANCY,
+    gallons_total       = co0(gallons_gascar) + co0(gallons_motorcycle) + co0(gallons_carpool)
+  )
+
+## Calculate MTCO2e ----
+students <- students %>%
+  mutate(mtco2e = gallons_total * EF_GAS_MTCO2)
+
+## Flags for assumptions ----
+students <- students %>%
+  mutate(
+    flag_mpg_default    = dplyr::if_else(is.na(mpg), 0, 1),
+    flag_carpool_assumed= dplyr::if_else(co0(mode_carpool) > 0, 1, 0)
+  )
+
+## Summarize key outcomes ----
+summary_df <- students %>%
+  summarise(
+    respondents            = dplyr::n(),
+    total_miles            = sum(annual_miles_total, na.rm = TRUE),
+    total_gallons          = sum(gallons_total,      na.rm = TRUE),
+    total_mtco2e           = sum(mtco2e,             na.rm = TRUE),
+    avg_miles_per_student  = mean(annual_miles_total, na.rm = TRUE),
+    avg_mtco2e_per_student = mean(mtco2e,             na.rm = TRUE)
+  )
+
+summary_df
+
+## Sanity checks (vehicle-miles vs gallons; and CO2 per gallon) ----
+students <- students %>%
+  mutate(
+    # Convert carpool person-miles to vehicle-miles for MPG check
+    veh_miles_gas   = co0(miles_mode_gascar) + co0(miles_mode_motorcycle) + co0(miles_mode_carpool) / CARPOOL_OCCUPANCY,
+    person_miles_gas= co0(miles_mode_gascar) + co0(miles_mode_motorcycle) + co0(miles_mode_carpool)
+  )
+
+mpg_vehicle_check <- sum(students$veh_miles_gas, na.rm = TRUE) / sum(students$gallons_total, na.rm = TRUE)
+co2_per_gal_mt    <- sum(students$mtco2e,        na.rm = TRUE) / sum(students$gallons_total, na.rm = TRUE)
+
+```
+
+```{r Summary, echo=FALSE}
+knitr::kable(summary_df, digits = 2,
+             caption = "Summary of student commuter estimates for FY25.")
+```
+
+A total of 61 valid student commuter responses were analyzed after cleaning and quality checks. Together, these students represent approximately 209,275 annual commuting miles, consuming an estimated 8,181 gallons of gasoline and producing about 72.7 metric tons of CO2 equivalent (MTCO2e) during FY25. On average, each commuter student travels roughly 3,600 miles per year, resulting in about 1.2 MTCO2e of emissions from daily travel to campus.  
+
+These totals reflect the full range of reported travel activity across all modes. However, only fuel-based modes such as gas-powered cars, carpools, and motorcycles contribute to the gasoline and CO2 estimates. Non-motorized and electric modes (walking, biking, electric vehicles, and bus ridership) are included in total mileage for behavioral context but produce zero direct impact or consideration in emissions.  
+
+The underlying calculations follow the standard commuting emissions framework:
+- Annual commuting miles were derived from reported one-way distance, average days on campus per week, and weeks in each academic term, assuming round-trip travel.  
+- Fuel consumption was computed using an average efficiency of 25 miles per gallon, with carpool miles divided evenly among two riders.  
+- Emissions were then estimated with the EPA factor of 8.887 kilograms of CO2 per gallon (0.008887 metric tons of CO2 per gallon).  
+
+Sanity checks confirmed internal consistency. The ratio of vehicle-miles to gallons equals the assumed 25 miles per gallon, and the resulting emissions factor equals 0.008887 MTCO2 per gallon.
+
+
+
+## Post-Stratification Methodology
+
+Post-stratification is used to expand the commuting estimates from the survey sample to represent the entire student population. Although the survey responses form a simple random sample, the composition of respondents does not perfectly match the known population distribution of key characteristics such as distance to campus or on/off-campus status. Post-stratification corrects for these imbalances by weighting the sample to known population counts within defined strata.
+
+Let the student population be divided into \(H\) strata, indexed by \(h = 1, 2). 
+Where Strata (h=1) is for students and strata (h=2) is for employees 
+For each stratum:
+
+- \(N_h\) is the known population size,
+
+- \(n_h\) is the number of survey respondents in that stratum,
+
+- \(\bar{y}_h\) is the sample mean of a quantity of interest (annual miles, gallons, or MTCO₂e).
+
+The total population estimate for outcome \(y\) is then obtained as:
+
+\[
+\hat{T}_y = \sum_{h=1}^{H} N_h \bar{y}_h
+\]
+
+and the corresponding population mean is
+
+\[
+\hat{\bar{y}} = \frac{\hat{T}_y}{N} = \frac{1}{N} \sum_{h=1}^{H} N_h \bar{y}_h
+\]
+
+where \(N = \sum_{h=1}^{H} N_h\) is the total population.
+
+This method uses the survey means within each stratum and multiplies them by the known population counts to recover unbiased estimates of totals and averages. The strata are typically defined using categorical variables such as on/off-campus residency and distance band from campus.
+
+Because post-stratification is performed after data collection, the observed stratum sample sizes \(n_h\) are random variables. This randomness adds variability to the estimator. The approximate variance of the post-stratified total is:
+
+\[
+\widehat{V}(\hat{T}_y)
+  = \frac{1}{n} \left(1 - \frac{n}{N}\right)
+    \sum_{h=1}^{H} A_h N_h^2 S_h^2
+  + \frac{1}{n^2} \sum_{h=1}^{H}
+    (1 - A_h) N_h^2 S_h^2
+\]
+
+where
+
+
+- \(S_h^2\) is the sample variance of \(y\) within stratum \(h\),
+
+
+- \(A_h = N_h / N\) is the population fraction of that stratum,
+
+
+- \(n\) is the total sample size.
+
+The first term represents the sampling variance assuming proportional allocation, and the second term represents the increase in variance due to post-stratification when stratum sizes differ from their true population proportions.
+
+The standard error is then given by:
+
+\[
+SE(\hat{T}_y) = \sqrt{\widehat{V}(\hat{T}_y)}
+\]
+
+This framework allows us to report both point estimates and confidence intervals for total commuting miles, total fuel use, and total CO₂ emissions after scaling to the entire student population.
+
+When the same process is repeated for employees, the overall commuting total for the university is obtained by combining the two groups:
+
+\[
+\hat{T}_{\text{Total}} = \hat{T}_{\text{Students}} + \hat{T}_{\text{Employees}}
+\]
+
+and the overall variance is the sum of the two independent variances:
+
+\[
+\widehat{V}(\hat{T}_{\text{Total}}) = \widehat{V}(\hat{T}_{\text{Students}}) + \widehat{V}(\hat{T}_{\text{Employees}})
+\]
+
+\[
+SE(\hat{T}_{\text{Total}}) = \sqrt{\widehat{V}(\hat{T}_{\text{Students}}) + \widehat{V}(\hat{T}_{\text{Employees}})}
+\]
+
+This ensures that uncertainty from both populations is properly carried forward when estimating the total commuting footprint for all Miami University commuters.
+
+## Limitation of the Post-Stratification Method
+
+A key limitation of the post-stratification approach is that it adjusts for known population totals **after** data collection, rather than through the sampling design itself. Because the sample was not originally drawn using proportional stratified sampling, the number of observations in each stratum (\(n_h\)) is random and may be small or even zero for some strata. This adds uncertainty to the estimates, particularly when certain subgroups are under-represented in the survey.
+
+In practical terms, this means that post-stratification can correct for imbalance in population representation, but it cannot fully remove bias if specific groups are missing or severely under-sampled. The variance of the estimator therefore includes an additional component that reflects this randomness in the realized stratum sizes. As a result, standard errors may be larger than those obtained from a properly stratified sample.
+
+Other practical limitations include:
+- The accuracy of results depends on the **quality of population counts** used for weighting.
+- The method assumes that within each stratum, the survey responses are **representative** of the entire population in that stratum.
+- If population variables are measured with error or do not fully capture the factors driving commuting behavior, the adjustment may only partially correct for bias.
+
+Despite these limitations, post-stratification remains a valuable and transparent tool for scaling sample-based commuting estimates to full population totals when complete census data are unavailable.
+
+
+## Employee Post-Stratification 
+Employees are treated as one post-stratum of the **entire** commuter population.  
+Let \(N_{\text{e}}\) be the number of employee commuters, \(N_{\text{s}}\) the number of student commuters, and
+\[
+N = N_{\text{s}} + N_{\text{e}}.
+\]
+Let \(n\) be the **total** number of valid survey respondents (students + employees).  
+For employees, define the population fraction
+\[
+A_{\text{e}} = \frac{N_{\text{e}}}{N}.
+\]
+
+For any outcome \(y\) (annual miles, gallons, or MTCO\(_2\)e), the employee-domain total is
+\[
+\hat{T}_{y,\text{e}} = N_{\text{e}} \,\bar{y}_{\text{e}},
+\]
+where \(\bar{y}_{\text{e}}\) is the sample mean among **employee** respondents, and the within-cell sample variance is
+\[
+S_{\text{e}}^{2} = \frac{1}{n_{\text{e}}-1}\sum_{j=1}^{n_{\text{e}}} (y_{j}-\bar{y}_{\text{e}})^{2},
+\]
+with \(n_{\text{e}}\) the number of employee respondents.
+
+Using the general post-stratified (domain) variance with \(h=1\) and \(A_{\text{e}}=N_{\text{e}}/N\), the variance of the employee total is
+\[
+\widehat{V}\!\left(\hat{T}_{y,\text{e}}\right)
+= \frac{1}{n}\!\left(1-\frac{n}{N}\right) A_{\text{e}}\,N_{\text{e}}^{2}\,S_{\text{e}}^{2}
+\;+\; \frac{1}{n^{2}}\!\left(1-A_{\text{e}}\right) N_{\text{e}}^{2}\,S_{\text{e}}^{2},
+\]
+and the standard error is
+\[
+SE\!\left(\hat{T}_{y,\text{e}}\right) = \sqrt{\widehat{V}\!\left(\hat{T}_{y,\text{e}}\right)}.
+\]
+
+**Notes.**
+
+- \(A_{\text{e}}\) uses the **full population** denominator \(N=N_{\text{s}}+N_{\text{e}}\).
+
+- \(n\) is the **total** respondents across both groups.
+
+- \(S_{\text{e}}^{2}\) and \(\bar{y}_{\text{e}}\) are computed **only** from employee respondents.
+
+
+
+```{r emp_sump, include =FALSE, warning=FALSE, message=FALSE}
+### Part B prep: compute employee outcomes (miles, gallons, MTCO2e)
+
+# mode columns present after your earlier rename
+mode_cols <- c("mode_gascar","mode_electriccar","mode_carpool","mode_motorcycle",
+               "mode_bus","mode_walk","mode_bike","mode_other")
+
+employees <- employees %>%
+  # ensure numeric mode shares and core fields
+  mutate(across(all_of(mode_cols), ~ as.numeric(co0(.)))) %>%
+  mutate(
+    days_fallspring  = cap_days(days_fallspring),
+    days_summerjterm = cap_days(days_summerjterm),
+    miles_to_campus  = as.numeric(miles_to_campus),
+
+    # academic-year days: FS + (JTerm + Summer)
+    annual_days = days_fallspring * WEEKS_FALLSPRING +
+                  days_summerjterm * (WEEKS_JTERM + WEEKS_SUMMER),
+
+    roundtrip_miles_day = 2 * miles_to_campus,
+    annual_miles_total  = roundtrip_miles_day * annual_days
+  )
+
+# allocate miles by mode (% -> miles); creates columns: miles_mode_*
+for (m in mode_cols) {
+  employees[[paste0("miles_", m)]] <-
+    employees$annual_miles_total * (bound0100(employees[[m]]) / 100)
+}
+
+# gallons and CO2e (gas-related modes only). Safe guard on mpg divide.
+employees <- employees %>%
+  mutate(
+    mpg = dplyr::if_else(
+      co0(mode_gascar) + co0(mode_motorcycle) + co0(mode_carpool) > 0,
+      MPG_GAS, NA_real_
+    ),
+    gallons_gascar      = ifelse(is.finite(mpg) & mpg > 0, co0(miles_mode_gascar)     / mpg, NA_real_),
+    gallons_motorcycle  = ifelse(is.finite(mpg) & mpg > 0, co0(miles_mode_motorcycle) / mpg, NA_real_),
+    gallons_carpool_raw = ifelse(is.finite(mpg) & mpg > 0, co0(miles_mode_carpool)    / mpg, NA_real_),
+    gallons_carpool     = gallons_carpool_raw / CARPOOL_OCCUPANCY,
+    gallons_total       = co0(gallons_gascar) + co0(gallons_motorcycle) + co0(gallons_carpool),
+    mtco2e              = gallons_total * EF_GAS_MTCO2
+  )
+
+# -------------------- Employee post-strat (single cell within full population) --------------------
+
+# Helpers
+safe_var <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x) >= 2) stats::var(x) else 0
+}
+
+# Domain = Employees
+# Uses A_e = N_employees / (N_students + N_employees)
+# Uses n_total = number of finite respondents across BOTH groups for the SAME outcome
+poststrat_employees_singlecell <- function(x_employees, x_students, N_employees, N_students) {
+  x_e    <- x_employees[is.finite(x_employees)]
+  x_s    <- x_students[is.finite(x_students)]
+  x_all  <- c(x_e, x_s)
+
+  n_e     <- length(x_e)
+  n_total <- length(x_all)
+  N_total <- N_employees + N_students
+  A_e     <- N_employees / N_total
+
+  ybar_e  <- if (n_e > 0) mean(x_e) else NA_real_
+  s2_e    <- safe_var(x_e)
+
+  # Point estimate for employee domain total
+  T_hat   <- N_employees * ybar_e
+
+  # Variance with two parts (stratification + post-stratification)
+  # V( T_hat_e ) =
+  #   (1/n_total)*(1 - n_total/N_total) * [ A_e * N_e^2 * s2_e ]
+  # + (1/n_total^2)                      * [ (1 - A_e) * N_e^2 * s2_e ]
+  term_strat <- (1 / n_total)  * (1 - n_total / N_total) * (A_e * (N_employees^2) * s2_e)
+  term_post  <- (1 / n_total^2) * ((1 - A_e) * (N_employees^2) * s2_e)
+
+  var_T <- term_strat + term_post
+  var_T <- if (is.finite(var_T) && var_T >= 0) var_T else 0
+  SE_T  <- sqrt(var_T)
+
+  dplyr::tibble(
+    n_employees = n_e,
+    n_total     = n_total,
+    N_employees = N_employees,
+    N_students  = N_students,
+    N_total     = N_total,
+    A_employees = A_e,
+    ybar_hat    = ybar_e,
+    s2          = s2_e,
+    T_hat       = T_hat,
+    term_strat  = term_strat,
+    term_post   = term_post,
+    var_T       = var_T,
+    SE          = SE_T,
+    CI_lo       = T_hat - 1.96 * SE_T,
+    CI_hi       = T_hat + 1.96 * SE_T
+  )
+}
+
+# Shorthands
+N2 <- N_employees
+N1 <- N_students
+
+# Compute per-outcome results for Employees (requires both groups to get n_total)
+res_emp_miles <- poststrat_employees_singlecell(
+  x_employees = employees$annual_miles_total,
+  x_students  = students$annual_miles_total,
+  N_employees = N2,
+  N_students  = N1
+) %>% dplyr::mutate(outcome = "annual_miles_total")
+
+res_emp_gal <- poststrat_employees_singlecell(
+  x_employees = employees$gallons_total,
+  x_students  = students$gallons_total,
+  N_employees = N2,
+  N_students  = N1
+) %>% dplyr::mutate(outcome = "gallons_total")
+
+res_emp_co2e <- poststrat_employees_singlecell(
+  x_employees = employees$mtco2e,
+  x_students  = students$mtco2e,
+  N_employees = N2,
+  N_students  = N1
+) %>% dplyr::mutate(outcome = "mtco2e")
+
+ps_results_employees_N2 <- dplyr::bind_rows(res_emp_miles, res_emp_gal, res_emp_co2e) %>%
+  dplyr::select(outcome,
+                n_employees, n_total,
+                N_employees, N_students, N_total, A_employees,
+                ybar_hat, s2, T_hat, SE, CI_lo, CI_hi)
+
+ps_results_employees_N2
+
+```
+
+
+
+```{r posy_emp, echo=FALSE}
+knitr::kable(ps_results_employees_N2, digits = 2,
+             caption = "Post-stratified employee commuter estimates for FY25.")
+```
+
+
+
+## Student Post-Stratification 
+
+Students are treated as one post-stratum of the **entire** commuter population.  
+Let \(N_{\text{s}}\) be the number of student commuters, \(N_{\text{e}}\) the number of employee commuters, and
+\[
+N = N_{\text{s}} + N_{\text{e}}.
+\]
+Let \(n\) be the total number of valid survey respondents (students + employees).  
+For students, define the population fraction
+\[
+A_{\text{s}} = \frac{N_{\text{s}}}{N}.
+\]
+
+For any outcome \(y\) (annual miles, gallons, or MTCO\(_2\)e), the domain total for students is
+\[
+\hat{T}_{y,\text{s}} = N_{\text{s}}\,\bar{y}_{\text{s}},
+\]
+where \(\bar{y}_{\text{s}}\) is the sample mean among student respondents and the within-cell sample variance is
+\[
+S_{\text{s}}^{2} = \frac{1}{n_{\text{s}}-1}\sum_{j=1}^{n_{\text{s}}} (y_{j}-\bar{y}_{\text{s}})^{2},
+\]
+with \(n_{\text{s}}\) the number of student respondents.
+
+Using the general post-stratified (domain) variance with \(h=1\) and \(A_{\text{s}}=N_{\text{s}}/N\), the variance of the student total is
+\[
+\widehat{V}\!\left(\hat{T}_{y,\text{s}}\right)
+= \frac{1}{n}\!\left(1-\frac{n}{N}\right) A_{\text{s}}\,N_{\text{s}}^{2}\,S_{\text{s}}^{2}
+\;+\; \frac{1}{n^{2}}\!\left(1-A_{\text{s}}\right) N_{\text{s}}^{2}\,S_{\text{s}}^{2},
+\]
+and the standard error is
+\[
+SE\!\left(\hat{T}_{y,\text{s}}\right) = \sqrt{\widehat{V}\!\left(\hat{T}_{y,\text{s}}\right)}.
+\]
+
+**Notes.**
+
+
+- \(A_{\text{s}}\) uses the **full population** denominator \(N=N_{\text{s}}+N_{\text{e}}\).
+
+
+- \(n\) is the **total** number of respondents (students + employees).
+
+- \(S_{\text{s}}^{2}\) and \(\bar{y}_{\text{s}}\) are computed **only over student respondents**.
+
+
+```{r post_student,include=FALSE, warning=FALSE, message=FALSE}
+
+library(readxl)
+library(dplyr)
+library(tibble)
+
+# -------------------- Read & rename (students) --------------------
+excel_path <- "Miami_Commuter_Analysis_FY25.xlsx"
+students_raw <- read_excel(excel_path, sheet = "Student Calculations")
+names(students_raw) <- trimws(names(students_raw))
+
+rename_map_students <- c(
+  live_on_campus   = "USER_Will_you_live_on_campus_during_the_2024_2025_academic_year_",
+  days_fallspring  = "On average, how many days a week do/will you come to campus in Fall/Spring semester?",
+  days_jterm       = "On average, how many days a week do/will you come to campus in JTerm?",
+  days_summer      = "On average, how many days a week do/will you come to campus in Summer?",
+  mode_walk        = "Walk",
+  mode_gascar      = "Drive (gas, hybrid electric, or diesel-powered car/truck)",
+  mode_electriccar = "Drive (plug-in electric vehicle)",
+  mode_bike        = "Bicycle or use other non-motorized means",
+  mode_bus         = "BCRTA bus",
+  mode_carpool     = "Vanpool or carpool as a passenger",
+  mode_motorcycle  = "Use a motorcycle, scooter or moped",
+  mode_other       = "Other",
+  miles_to_campus  = "Miles_to_campus"
+)
+
+students <- students_raw %>%
+  rename(any_of(rename_map_students))
+
+# -------------------- Compute outcomes (miles, gallons, CO2e) --------------------
+mode_cols <- c("mode_gascar","mode_electriccar","mode_carpool","mode_motorcycle",
+               "mode_bus","mode_walk","mode_bike","mode_other")
+
+# Assumes helpers/constants already defined:
+# co0(), cap_days(), bound0100(); MPG_GAS; CARPOOL_OCCUPANCY; EF_GAS_MTCO2;
+# WEEKS_FALLSPRING, WEEKS_JTERM, WEEKS_SUMMER
+
+students <- students %>%
+  mutate(across(all_of(mode_cols), ~ as.numeric(co0(.)))) %>%
+  mutate(
+    days_fallspring  = cap_days(days_fallspring),
+    days_jterm       = cap_days(days_jterm),
+    days_summer      = cap_days(days_summer),
+    miles_to_campus  = as.numeric(miles_to_campus),
+
+    # Academic-year days = FS + JTerm + Summer
+    annual_days = days_fallspring * WEEKS_FALLSPRING +
+                  days_jterm      * WEEKS_JTERM +
+                  days_summer     * WEEKS_SUMMER,
+
+    roundtrip_miles_day = 2 * miles_to_campus,
+    annual_miles_total  = roundtrip_miles_day * annual_days
+  )
+
+# Allocate miles by mode (% -> miles); creates: miles_mode_*
+for (m in mode_cols) {
+  students[[paste0("miles_", m)]] <-
+    students$annual_miles_total * (bound0100(students[[m]]) / 100)
+}
+
+# -------- CORRECTED: Gallons & CO2e (propagate NA if miles are NA) -----------
+students <- students %>%
+  mutate(
+    mpg = dplyr::if_else(
+      co0(mode_gascar) + co0(mode_motorcycle) + co0(mode_carpool) > 0,
+      MPG_GAS, NA_real_
+    ),
+    # Only compute gallons when both annual_miles_total and mpg are valid
+    gallons_gascar      = ifelse(is.finite(annual_miles_total) & is.finite(mpg) & mpg > 0,
+                                 co0(miles_mode_gascar)     / mpg, NA_real_),
+    gallons_motorcycle  = ifelse(is.finite(annual_miles_total) & is.finite(mpg) & mpg > 0,
+                                 co0(miles_mode_motorcycle) / mpg, NA_real_),
+    gallons_carpool_raw = ifelse(is.finite(annual_miles_total) & is.finite(mpg) & mpg > 0,
+                                 co0(miles_mode_carpool)    / mpg, NA_real_),
+    gallons_carpool     = ifelse(is.finite(gallons_carpool_raw),
+                                 gallons_carpool_raw / CARPOOL_OCCUPANCY, NA_real_),
+
+    # Keep NA if any component is NA (do NOT set na.rm = TRUE)
+    gallons_total = (gallons_gascar + gallons_motorcycle + gallons_carpool),
+
+    mtco2e = ifelse(is.finite(gallons_total),
+                    gallons_total * EF_GAS_MTCO2, NA_real_)
+  )
+
+# -------------------- Student post-strat (single cell within full population) --------------------
+safe_var <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x) >= 2) stats::var(x) else 0
+}
+
+poststrat_students_singlecell <- function(x_students, x_employees, N_students, N_employees) {
+  x_s   <- x_students[is.finite(x_students)]
+  x_e   <- x_employees[is.finite(x_employees)]
+  x_all <- c(x_s, x_e)
+
+  n_s     <- length(x_s)
+  n_total <- length(x_all)
+  N_total <- N_students + N_employees
+  A_s     <- N_students / N_total
+
+  ybar_s  <- if (n_s > 0) mean(x_s) else NA_real_
+  s2_s    <- safe_var(x_s)
+
+  # Student domain total
+  T_hat   <- N_students * ybar_s
+
+  # Variance (stratification + post-stratification)
+  term_strat <- (1 / n_total)  * (1 - n_total / N_total) * (A_s * (N_students^2) * s2_s)
+  term_post  <- (1 / n_total^2) * ((1 - A_s) * (N_students^2) * s2_s)
+
+  var_T <- term_strat + term_post
+  var_T <- if (is.finite(var_T) && var_T >= 0) var_T else 0
+  SE_T  <- sqrt(var_T)
+
+  tibble(
+    n_students  = n_s,
+    n_total     = n_total,
+    N_students  = N_students,
+    N_employees = N_employees,
+    N_total     = N_total,
+    A_students  = A_s,
+    ybar_hat    = ybar_s,
+    s2          = s2_s,
+    T_hat       = T_hat,
+    term_strat  = term_strat,
+    term_post   = term_post,
+    var_T       = var_T,
+    SE          = SE_T,
+    CI_lo       = T_hat - 1.96 * SE_T,
+    CI_hi       = T_hat + 1.96 * SE_T
+  )
+}
+
+# Shorthands
+N1 <- N_students
+N2 <- N_employees
+
+# Results for Students (per outcome; needs both groups to compute n_total)
+res_stu_miles <- poststrat_students_singlecell(
+  x_students  = students$annual_miles_total,
+  x_employees = employees$annual_miles_total,
+  N_students  = N1, N_employees = N2
+) %>% dplyr::mutate(outcome = "annual_miles_total")
+
+res_stu_gal <- poststrat_students_singlecell(
+  x_students  = students$gallons_total,
+  x_employees = employees$gallons_total,
+  N_students  = N1, N_employees = N2
+) %>% dplyr::mutate(outcome = "gallons_total")
+
+res_stu_co2e <- poststrat_students_singlecell(
+  x_students  = students$mtco2e,
+  x_employees = employees$mtco2e,
+  N_students  = N1, N_employees = N2
+) %>% dplyr::mutate(outcome = "mtco2e")
+
+ps_results_students_N <- dplyr::bind_rows(res_stu_miles, res_stu_gal, res_stu_co2e) %>%
+  dplyr::select(outcome,
+                n_students, n_total,
+                N_students, N_employees, N_total, A_students,
+                ybar_hat, s2, T_hat, SE, CI_lo, CI_hi)
+
+ps_results_students_N
+
+```
+
+## Post-Stratified Student Commuter Estimates
+
+The post-stratified analysis for students treated all off-campus respondents as a single commuter stratum (since population data by distance band were unavailable). The finite-population correction was applied using the known total student commuter population \( N_1 = 943 \) and the survey sample size.
+
+Under this approach, the estimated population totals and standard errors are:
+
+```{r post_summary, echo=FALSE}
+knitr::kable(ps_results_students_N, digits = 2,
+             caption = "Post-stratified student commuter estimates for FY25.")
+```
+
+
+
+## Combined Commuter Totals (Students + Employees)
+
+The all-commuter totals aggregate the **student** and **employee** domain estimates.  
+Let \(\hat{T}_{y,\text{s}}\) and \(\hat{T}_{y,\text{e}}\) be the corrected post-stratified totals for students and employees, respectively (each computed as a **single post-stratum within the full population** using \(A_h=N_h/N\) and \(n\) = total respondents across both groups). The combined total is
+
+\[
+\hat{T}_{y,\text{all}} \;=\; \hat{T}_{y,\text{s}} \;+\; \hat{T}_{y,\text{e}}.
+\]
+
+Because the student and employee domains are **disjoint**, the variance of the combined total is the **sum of the domain variances**:
+
+\[
+\widehat{V}\!\left(\hat{T}_{y,\text{all}}\right)
+\;=\;
+\widehat{V}\!\left(\hat{T}_{y,\text{s}}\right)
+\;+\;
+\widehat{V}\!\left(\hat{T}_{y,\text{e}}\right),
+\qquad
+SE\!\left(\hat{T}_{y,\text{all}}\right)
+\;=\;
+\sqrt{\widehat{V}\!\left(\hat{T}_{y,\text{all}}\right)}.
+\]
+
+For reporting, each result is shown as the point estimate \(\pm\) one standard error (SE).  
+When useful, 95% confidence intervals are computed as
+\[
+\hat{T} \pm 1.96 \times SE.
+\]
+
+```{r combined3, include=FALSE, warning=FALSE, message=FALSE}
+library(dplyr)
+library(tibble)
+
+# Expected inputs already computed upstream:
+#   ps_results_students_N   # has: outcome, T_hat, SE   (students, corrected method)
+#   ps_results_employees_N2 # has: outcome, T_hat, SE   (employees, corrected method)
+
+# Extract and rename
+S <- ps_results_students_N %>%
+  select(outcome, T_hat_students = T_hat, SE_students = SE)
+
+E <- ps_results_employees_N2 %>%
+  select(outcome, T_hat_employees = T_hat, SE_employees = SE)
+
+# Combine and compute TOTALS; VARs add, then sqrt for SE_total
+combined_core <- S %>%
+  inner_join(E, by = "outcome") %>%
+  mutate(
+    # individual variances
+    Var_students  = SE_students^2,
+    Var_employees = SE_employees^2,
+
+    # totals
+    T_hat_all = T_hat_students + T_hat_employees,
+    Var_all   = Var_students + Var_employees,   # <-- add variances
+    SE_all    = sqrt(pmax(Var_all, 0)),         # <-- then take sqrt
+
+    # 95% CI for total
+    CI_lo_all = T_hat_all - 1.96 * SE_all,
+    CI_hi_all = T_hat_all + 1.96 * SE_all
+  )
+
+# ---------------- Table 1: Numeric results with Confidence Intervals ----------------
+table_ci <- combined_core %>%
+  select(
+    outcome,
+    T_hat_students, SE_students,
+    T_hat_employees, SE_employees,
+    T_hat_all, SE_all, CI_lo_all, CI_hi_all
+  )
+
+# ---------------- Table 2: Pretty "estimate ± SE" displays ----------------
+fmt <- function(x) formatC(round(x, 0), big.mark = ",")
+pm <- function(est, se) paste0(fmt(est), " \u00B1 ", fmt(se))
+
+table_pmse <- combined_core %>%
+  transmute(
+    outcome,
+    students  = pm(T_hat_students, SE_students),
+    employees = pm(T_hat_employees, SE_employees),
+    total     = pm(T_hat_all,      SE_all)
+  )
+
+# Output both tables
+table_ci
+table_pmse
+
+```
+
+
+```{r Combined1, echo=FALSE}
+knitr::kable(table_ci, digits = 2,
+caption = "Combined post-stratified totals for students + employees (FY25).")
+```
+
+```{r results='asis', echo=FALSE,warning=FALSE, message=FALSE}
+library(knitr)
+library(kableExtra)
+
+# Display the "estimate ± SE" table neatly formatted
+table_pmse %>%
+  kable(
+    caption = "Combined Commuter Totals — Point Estimate ± Standard Error",
+    align = c("l", "c", "c", "c"),
+    col.names = c("Outcome", "Students", "Employees", "Combined Total"),
+    format = "html"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = FALSE,
+    position = "center",
+    font_size = 13
+  )
+
+```
+
+
+
+
+### CO₂e Share by Commuter Group
+
+The figure below shows the proportional contribution of students and employees to total FY25 commuting emissions.  
+This visualization highlights the relative magnitude of each group’s contribution, clarifying where emission-reduction strategies may have the greatest impact.
+
+```{r final, echo=FALSE, warning=FALSE, message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tibble)
+
+share_df <- tibble(
+  group   = c("Students", "Employees"),
+  mtco2e  = c(
+    ps_results_students_N %>% filter(outcome == "mtco2e") %>% pull(T_hat),
+    ps_results_employees_N2 %>% filter(outcome == "mtco2e") %>% pull(T_hat)
+  )
+) %>%
+  mutate(
+    share = mtco2e / sum(mtco2e),
+    label = paste0(group, "\n", round(share * 100, 1), "%")
+  )
+
+ggplot(share_df, aes(x = "", y = share, fill = group)) +
+  geom_col(width = 1, color = "white") +
+  coord_polar(theta = "y") +
+  geom_text(aes(label = label),
+            position = position_stack(vjust = 0.5),
+            size = 5, color = "white", fontface = "bold") +
+  scale_fill_manual(values = c("#E69F00", "#56B4E9")) +
+  labs(
+    title = "Share of Total CO2 Emissions by Commuter Group (FY25)",
+    x = NULL, y = NULL,
+    caption = "Based on post-stratified totals for students and employees."
+  ) +
+  theme_void(base_size = 13) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "plain", size = 15, hjust = 0.5)
+  )
+```
+
+
+Proportional contribution of students and employees to total FY25 commuting CO₂ emissions. Employees account for roughly three-quarters of total emissions.
+
+### Group Comparisons with Uncertainty
+
+To further illustrate group-level differences, Figure below compares students, employees, and combined totals across all outcomes, displaying both point estimates and their standard errors.
+
+```{r comparison, echo=FALSE, warning=FALSE, message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(stringr)
+
+# Build tidy table for plotting -----------------------------------------------
+S <- ps_results_students_N %>%
+  select(outcome, T_hat_s = T_hat, SE_s = SE) %>%
+  mutate(group = "Students", estimate = T_hat_s, se = SE_s) %>%
+  select(group, outcome, estimate, se)
+
+E <- ps_results_employees_N2 %>%
+  select(outcome, T_hat_e = T_hat, SE_e = SE) %>%
+  mutate(group = "Employees", estimate = T_hat_e, se = SE_e) %>%
+  select(group, outcome, estimate, se)
+
+Cmb <- combined_core %>%
+  select(outcome, T_hat_all, SE_all) %>%
+  mutate(group = "Combined", estimate = T_hat_all, se = SE_all) %>%
+  select(group, outcome, estimate, se)
+
+plot_df <- bind_rows(S, E, Cmb) %>%
+  mutate(
+    unit_scale = case_when(
+      outcome == "annual_miles_total" ~ 1e6,
+      outcome == "gallons_total"      ~ 1e3,
+      outcome == "mtco2e"             ~ 1e3,
+      TRUE                            ~ 1
+    ),
+    display_value = estimate / unit_scale,
+    display_se    = se / unit_scale,
+    outcome_label = case_when(
+      outcome == "annual_miles_total" ~ "Annual Miles (millions)",
+      outcome == "gallons_total"      ~ "Gasoline (thousands of gallons)",
+      outcome == "mtco2e"             ~ "CO2e (thousands of metric tons)",
+      TRUE ~ outcome
+    )
+  )
+
+plot_df$group <- factor(plot_df$group, levels = c("Students","Employees","Combined"))
+
+# Plot -------------------------------------------------------------------------
+ggplot(plot_df, aes(x = group, y = display_value)) +
+  geom_col(width = 0.6, fill = "#56B4E9") +
+  geom_errorbar(aes(ymin = display_value - display_se,
+                    ymax = display_value + display_se),
+                width = 0.15, linewidth = 0.5) +
+  geom_text(aes(label = scales::label_number(big.mark = ",", accuracy = 0.1)(display_value)),
+            vjust = -0.6, size = 3.5) +
+  facet_wrap(~ outcome_label, scales = "free_y") +
+  labs(
+    title   = "Commuting Totals and Uncertainty by Group",
+    x       = NULL,
+    y       = NULL,
+    caption = "Bars are point estimates; whiskers represent \u00B1 1 standard error."
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    strip.text = element_text(face = "plain"),
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_text(margin = margin(t = 5))
+  )
+
+```
+
+
+## Interpretation of Commuting Totals and Uncertainty (FY25)
+
+The visualization above presents post-stratified estimates of annual commuting mileage, fuel use, and associated CO₂ emissions for Miami University students, employees, and the combined campus population during FY25.  
+Each bar represents the point estimate, while the black whiskers denote one standard error in each direction, providing a visual indication of sampling precision.
+
+**1. Commuting Mileage**  
+Total annual commuting mileage is estimated at **13.8 million miles**, of which **employees account for about 10.4 million miles (≈75%)** and **students approximately 3.4 million miles (≈25%)**.  
+This difference reflects both higher average commuting distances and more frequent on-campus workdays among employees.  
+The relatively small error bars indicate that these estimates are statistically stable and not driven by sampling variability.
+
+**2. Gasoline Consumption**  
+Estimated total gasoline use for FY25 commuting activities is **approximately 539,000 gallons**, with employees consuming the majority (**~406,000 gallons**) and students using the remainder (**~133,000 gallons**).  
+The proportional relationship between fuel use and mileage confirms consistent fuel-efficiency assumptions across commuter types.  
+The error margins are narrow, reinforcing the reliability of these aggregate estimates.
+
+**3. CO₂ Emissions**  
+Total annual **CO₂ emissions are about 4,794 metric tons**, with **employees contributing roughly 3,612 metric tons (≈75%)** and **students about 1,182 metric tons (≈25%)**.  
+This distribution closely mirrors the mileage and fuel consumption patterns, indicating that employee commuting remains the primary driver of transportation-related emissions.  
+Given the small standard errors, the university can be confident that these results accurately represent commuting-related greenhouse gas emissions for FY25.
+
+**4. Statistical Precision and Policy Relevance**  
+Across all indicators, the short whiskers (± 1 SE) demonstrate low relative uncertainty—roughly **10–12 percent of each total**.  
+This level of precision is strong for a campus-wide behavioral survey and validates the use of post-stratification as a sound estimation method.  
+The combined estimates now serve as a **baseline reference** for future tracking of transportation-related emissions reductions under Miami University’s Climate Action Plan.
+ 
+
+## Discussion of Results
+
+The post-stratified estimates provide a clear picture of commuting activity across Miami University’s student and employee populations for FY25. 
+By integrating survey responses with known population counts, the analysis accounts for the different population sizes and provides realistic campus-wide totals.
+
+Overall, the results confirm that **employees contribute the majority of total commuting impact**. 
+While students represent a large portion of survey respondents, their shorter commuting distances and lower travel frequencies lead to much smaller total mileage and emissions. 
+Employees, in contrast, tend to commute longer distances and more days per week, which explains their higher contribution to overall emissions.
+
+The **combined post-stratified totals** indicate approximately **13.8 million annual commuting miles**, **539,000 gallons of gasoline**, and **4,794 metric tons of CO₂e** generated by Miami University commuters in FY25. 
+Sampling uncertainty is moderate (roughly 10–12%), meaning these estimates are statistically robust and represent a strong baseline for future tracking and mitigation efforts. 
+
+In short, this analysis highlights the relative commuting impact of students versus employees and provides actionable insight for emission reduction planning.
+
+
+
+**Key Findings:**
+
+- **Employees dominate total emissions**, contributing roughly **75% of total commuting-related CO₂e**, mainly due to longer travel distances and higher weekly campus attendance.
+- **Students contribute about one-quarter of total emissions**, largely from gas-powered personal vehicles.
+- The combined FY25 emissions from commuting activities are approximately **4,794 metric tons of CO₂e**, equivalent to the annual emissions from about 1,000 gasoline-powered passenger vehicles.
+
+These findings form a baseline for ongoing sustainability tracking within the university’s Climate Action Plan.
+
+
+# Conclusions
+
+The post-stratified commuter estimates demonstrate that Miami University’s commuting emissions are primarily driven by employees, with students playing a smaller but still significant role. 
+The precision of the estimates (as shown by the small standard errors) increases confidence in these results. 
+
+Moving forward, these outcomes can guide targeted emission reduction strategies, particularly those focused on employee commuting habits. 
+The data also establish a consistent methodology that can be replicated in future fiscal years to monitor trends and evaluate the impact of sustainable commuting initiatives.
+
+
+## Recommendations
+
+Based on the results and relevant sustainability literature, several practical steps are recommended:
+
+1. **Expand sustainable transportation programs**  
+   Increase incentives for carpooling, public transit, and active commuting (walking and biking), especially among employees who contribute the highest total emissions.
+
+2. **Enhance campus transit partnerships**  
+   Collaborate further with **BCRTA** to expand routes and frequency, making bus commuting a more viable option for both students and staff.
+
+3. **Encourage hybrid and remote work schedules**  
+   Where possible, flexible work arrangements can directly reduce vehicle miles traveled and subsequent emissions.
+
+4. **Support electric vehicle adoption**  
+   Provide workplace charging infrastructure and parking incentives for EV owners to accelerate the transition from gas vehicles.
+
+5. **Education and behavior change campaigns**  
+   Increase awareness through the Office of Sustainability, highlighting the environmental impact of commuting and the benefits of alternative transportation.
+
+6. **Annual tracking and reporting**  
+   Institutionalize this post-stratified methodology as part of Miami’s annual sustainability reporting framework, ensuring continuous monitoring and accountability.
+
+
+
+# References
+
+- World Food Programme (2021). *Sustainable Commuting: Reducing Emissions from Daily Travel.*  
+  [WFP Sustainable Commuting Report](https://docs.wfp.org/api/documents/WFP-0000121326/download/)
+
+- Miami University (2024). *Project 3: Issues and Resources.*  
+  [Miami University Canvas Resource](https://miamioh.instructure.com/courses/237421/pages/project-3-issues-and-resources?module_item_id=6017378)
+
+- YouTube. (2024). *Sustainable Commuting and Behavioral Change Strategies.*  
+  [Watch Video](https://www.youtube.com/watch?v=YWgApV2CMbw)
+
+- Notes and course guidance by **Professor Michael Hughes**, Department of Geography, Miami University, were also instrumental in shaping the methodological and interpretive aspects of this analysis.
